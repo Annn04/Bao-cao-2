@@ -1,0 +1,56 @@
+<script>
+async function readExcel(url){
+  const res = await fetch(url);
+  const buf = await res.arrayBuffer();
+  const wb = XLSX.read(buf,{type:"array"});
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(sheet,{header:1});
+  const headers = raw[0];
+  return raw.slice(1).map(r=>{
+    let o={}; headers.forEach((h,i)=>o[h]=r[i]); return o;
+  });
+}
+
+Promise.all([
+  readExcel("data.xlsx"),
+  readExcel("donvi.xlsx")
+]).then(([thueBao, donVi])=>{
+
+  // Map đơn vị theo MST
+  const DONVI_MAP = {};
+  donVi.forEach(d=>{
+    DONVI_MAP[d.MST] = d;
+  });
+
+  // Ghép dữ liệu
+  const CHI_TIET = thueBao.map(tb=>{
+    const dv = DONVI_MAP[tb.MST] || {};
+    return {
+      TEN_DNTN: dv.TEN_DNTN || "Chưa đối chiếu",
+      MST: tb.MST,
+      TEN_XA: dv["Tên xã"] || "",
+      LOAIHINH_TB: tb.LOAIHINH_TB,
+      MA_TB: tb.MA_TB,
+      DOANH_THU: tb.DOANH_THU
+    };
+  });
+
+  hienBangChiTiet(CHI_TIET);
+});
+
+function hienBangChiTiet(data){
+  let h="<table><tr>";
+  ["TEN_DNTN","MST","TEN_XA","LOAIHINH_TB","MA_TB","DOANH_THU"]
+    .forEach(c=>h+=`<th>${c}</th>`);
+  h+="</tr>";
+
+  data.forEach(r=>{
+    h+="<tr>";
+    ["TEN_DNTN","MST","TEN_XA","LOAIHINH_TB","MA_TB","DOANH_THU"]
+      .forEach(c=>h+=`<td>${r[c]||""}</td>`);
+    h+="</tr>";
+  });
+  h+="</table>";
+  document.body.innerHTML += "<h4>📋 Đối chiếu đơn vị – thuê bao</h4>"+h;
+}
+</script>
