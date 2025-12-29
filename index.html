@@ -1,0 +1,76 @@
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+async function readExcel(url){
+  const res = await fetch(url);
+  const buf = await res.arrayBuffer();
+  const wb = XLSX.read(buf,{type:"array"});
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(sheet,{header:1});
+  const headers = raw[0];
+  return raw.slice(1).map(r=>{
+    let o={};
+    headers.forEach((h,i)=>o[h]=r[i]);
+    return o;
+  });
+}
+
+Promise.all([
+  readExcel("data.xlsx"),   // Danh sách thuê bao
+  readExcel("donvi.xlsx")   // Danh sách đơn vị
+]).then(([thueBao, donVi])=>{
+
+  // Map đơn vị theo MST
+  const DONVI_MAP = {};
+  donVi.forEach(d=>{
+    DONVI_MAP[String(d.MST).trim()] = d;
+  });
+
+  // Ghép dữ liệu thuê bao + đơn vị
+  const CHI_TIET = thueBao.map(tb=>{
+    const mst = String(tb.MST).trim();
+    const dv = DONVI_MAP[mst] || {};
+    return {
+      TEN_DTNT: dv.TEN_DTNT || "Chưa đối chiếu",
+      MST: mst,
+      TEN_XA: dv["Tên xã"] || "",
+      LOAIHINH_TB: tb.LOAIHINH_TB || "",
+      MA_TB: tb.MA_TB || "",
+      DOANH_THU: tb.DOANH_THU || 0
+    };
+  });
+
+  hienBangChiTiet(CHI_TIET);
+});
+
+function hienBangChiTiet(data){
+  let h = `
+    <h3>📋 BẢNG ĐỐI CHIẾU ĐƠN VỊ – THUÊ BAO</h3>
+    <table border="1" cellpadding="6" cellspacing="0">
+      <tr>
+        <th>Tên đơn vị</th>
+        <th>MST</th>
+        <th>Tên xã</th>
+        <th>Loại hình thuê bao</th>
+        <th>Mã thuê bao</th>
+        <th>Doanh thu</th>
+      </tr>
+  `;
+
+  data.forEach(r=>{
+    h += `
+      <tr>
+        <td>${r.TEN_DTNT}</td>
+        <td>${r.MST}</td>
+        <td>${r.TEN_XA}</td>
+        <td>${r.LOAIHINH_TB}</td>
+        <td>${r.MA_TB}</td>
+        <td style="text-align:right">${Number(r.DOANH_THU).toLocaleString()}</td>
+      </tr>
+    `;
+  });
+
+  h += "</table>";
+  document.body.innerHTML = h;
+}
+</script>
